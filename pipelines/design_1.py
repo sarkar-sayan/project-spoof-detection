@@ -9,94 +9,34 @@ import os
 import pickle
 from typing import List, Tuple
 
-import torch
-import torch.nn.functional as F
+import torch  # type: ignore
+import torch.nn.functional as F  # type: ignore
 
-from models import (
-    PreProcess_img,
-    get_LBP,
-    get_model1,
-    get_model3,
-    get_models,
-    get_weighted_score_img,
-    normalisation,
-    gray_transform,
-)
-
+import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAVED_MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
 
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
 
-def load_models() -> Tuple[torch.nn.Module, torch.nn.Module, torch.nn.Module, object]:
-    model1 = get_model1()
-    model1.load_state_dict(torch.load(os.path.join(SAVED_MODELS_DIR, "model1.pth")))
-    model1.eval()
-
-    model3 = get_model3()
-    model3.load_state_dict(torch.load(os.path.join(SAVED_MODELS_DIR, "model3.pth")))
-    model3.eval()
-
-    model9 = get_LBP()
-    model9.load_state_dict(torch.load(os.path.join(SAVED_MODELS_DIR, "model9.pth")))
-    model9.eval()
-
-    with open(os.path.join(SAVED_MODELS_DIR, "svm.pk1"), "rb") as file:
-        clf = pickle.load(file)
-
-    return model1, model3, model9, clf
+from lib.train_ensemble import get_models  # type: ignore
+from lib.utils import PreProcess_img, Return_Scores_all, load_models  # type: ignore
 
 
-def Nom_Score(model: torch.nn.Module, image: torch.Tensor) -> Tuple[float, int]:
-    model.eval()
-    with torch.no_grad():
-        output = model(image)
-    probabilities = F.softmax(output, dim=1)
-    confidence_scores, predicted_classes = torch.max(probabilities, dim=1)
-    class_index = predicted_classes.item()
-    cs = confidence_scores.item()
-    if class_index != 0:
-        return 1 - cs, class_index
-    return cs, class_index
 
-
-def Return_Scores_all(
-    originals: List[torch.nn.Module],
-    models_list: List[object],
-    image: torch.Tensor,
-    lbp_model: torch.nn.Module,
-    clf: object,
-) -> Tuple[List[float], List[int]]:
-    scores: List[float] = []
-    preds: List[int] = []
-    for model in models_list:
-        if model is lbp_model:
-            img_gray = gray_transform(image)
-            c, p = Nom_Score(model, img_gray)
-        elif model is clf:
-            img = get_weighted_score_img(originals, image)
-            conf = clf.decision_function(img)
-            conf = normalisation(conf)
-            c = conf.tolist()[0]
-            pred = clf.predict(img)
-            p = pred.tolist()[0]
-        else:
-            c, p = Nom_Score(model, image)
-        scores.append(c)
-        preds.append(p)
-    return scores, preds
 
 
 def main() -> None:
-    model1, model3, model9, clf = load_models()
+    model1, model3, model9, clf = load_models(SAVED_MODELS_DIR)
     originals = get_models(model1, model3, model9)
     modelsvm = [model1, clf, model9]
 
     subject = "043-M"
-    input_image_path = "/content/drive/MyDrive/DataSets/Palmvein_h/Registration"
-    th = [0.0, 0.0, 0.0]
-    frr = 0
-    sfar = 0
+    input_image_path = os.path.join(BASE_DIR, "datasets", "Registration")
+    th: List[float] = [0.0, 0.0, 0.0]
+    frr: float = 0.0
+    sfar: float = 0.0
 
     for root, dirs, _ in os.walk(input_image_path):
         if os.path.basename(root) == subject:
@@ -106,11 +46,12 @@ def main() -> None:
                     image_files = glob.glob(os.path.join(subdir_path, "*.png"))
                     for image_file in image_files:
                         image = PreProcess_img(image_file)
+                        score: List[float]
                         score, _ = Return_Scores_all(
                             originals, modelsvm, image, model9, clf
                         )
                         for i in range(len(score)):
-                            th[i] = th[i] + score[i] / 2
+                            th[i] = th[i] + score[i] / 2  # type: ignore
 
     print(f"Threshold Values for Subject {subject} are: {th}")
 
@@ -123,36 +64,36 @@ def main() -> None:
                     image_files = glob.glob(os.path.join(subdir_path, "*.png"))
                     for image_file in image_files:
                         image = PreProcess_img(image_file)
-                        accept = 0
+                        accept: int = 0
                         score, _ = Return_Scores_all(
                             originals, modelsvm, image, model9, clf
                         )
                         for i in range(len(score)):
                             if score[i] > th[i]:
-                                accept += 1
+                                accept = accept + 1  # type: ignore
                         if accept >= 2:
                             print(
                                 "Image Accepted. Same Subject ",
                                 os.path.basename(root),
                             )
-                            sfar += 1
+                            sfar = sfar + 1.0  # type: ignore
                         else:
                             print("Image Rejected. Try Again")
                     print("Spoof Probes Accepted:", sfar)
-                    print("SFAR% for Same User is:", sfar / len(image_files))
-                    sfar = 0
+                    print("SFAR% for Same User is:", sfar / len(image_files))  # type: ignore
+                    sfar = 0.0
                 elif subdir == "probe_real":
                     subdir_path = os.path.join(root, subdir)
                     image_files = glob.glob(os.path.join(subdir_path, "*.png"))
                     for image_file in image_files:
                         image = PreProcess_img(image_file)
-                        accept = 0
+                        accept: int = 0
                         score, _ = Return_Scores_all(
                             originals, modelsvm, image, model9, clf
                         )
                         for i in range(len(score)):
                             if score[i] > th[i]:
-                                accept += 1
+                                accept = accept + 1  # type: ignore
                         if accept >= 2:
                             print(
                                 "Image Accepted. Same Subject ",
@@ -160,10 +101,10 @@ def main() -> None:
                             )
                         else:
                             print("Image Rejected. Try Again")
-                            frr += 1
+                            frr = frr + 1.0  # type: ignore
                     print("Genuine Probes Rejected:", frr)
-                    print("FRR% for Same User is:", frr / len(image_files))
-                    frr = 0
+                    print("FRR% for Same User is:", frr / len(image_files))  # type: ignore
+                    frr = 0.0
 
 
 if __name__ == "__main__":

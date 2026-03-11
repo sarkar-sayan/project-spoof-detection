@@ -9,38 +9,22 @@ import glob
 import os
 from typing import List
 
-import numpy as np
-import torch
-from sklearn.metrics.pairwise import euclidean_distances
+import numpy as np  # type: ignore
+import torch  # type: ignore
+from sklearn.metrics.pairwise import euclidean_distances  # type: ignore
 
-from models import (
-    PreProcess_img,
-    get_LBP,
-    get_model1,
-    get_model3,
-    get_models,
-    gray_transform,
-)
-
+import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAVED_MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
 
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
 
-def load_models() -> List[torch.nn.Module]:
-    model1 = get_model1()
-    model1.load_state_dict(torch.load(os.path.join(SAVED_MODELS_DIR, "model1.pth")))
-    model1.eval()
+from lib.utils import PreProcess_img, gray_transform, load_models_list  # type: ignore
 
-    model3 = get_model3()
-    model3.load_state_dict(torch.load(os.path.join(SAVED_MODELS_DIR, "model3.pth")))
-    model3.eval()
 
-    model9 = get_LBP()
-    model9.load_state_dict(torch.load(os.path.join(SAVED_MODELS_DIR, "model9.pth")))
-    model9.eval()
 
-    return get_models(model1, model3, model9)
 
 
 def extract_features(model: torch.nn.Module, image: torch.Tensor) -> torch.Tensor:
@@ -111,10 +95,10 @@ def returnPredClass(pred_list: List[int]) -> int:
 
 
 def main() -> None:
-    models_list = load_models()
+    models_list = load_models_list(SAVED_MODELS_DIR)
 
     subject = "043-M"
-    input_image_path = "/content/drive/MyDrive/DataSets/Palmvein_h/Registration"
+    input_image_path = os.path.join(BASE_DIR, "datasets", "Registration")
     threshold = [0.3, 0.3, 1.0]
 
     for root, dirs, _ in os.walk(input_image_path):
@@ -152,11 +136,11 @@ def main() -> None:
                         pred_class = returnPredClass(pred)
                         if pred_class == 0:
                             print("Image Accepted. Same Subject ", os.path.basename(root))
-                            sfar += 1
+                            sfar += 1  # type: ignore
                         else:
                             print("Image Rejected. Try Again")
                     print("Spoof Probes Accepted:", sfar)
-                    print("SFAR% for Same User is:", sfar / len(image_files))
+                    print("SFAR% for Same User is:", sfar / len(image_files))  # type: ignore
                     sfar = 0
                 elif subdir == "probe_real":
                     subdir_path = os.path.join(root, subdir)
@@ -169,9 +153,9 @@ def main() -> None:
                             print("Image Accepted. Same Subject ", os.path.basename(root))
                         else:
                             print("Image Rejected. Try Again")
-                            frr += 1
+                            frr += 1  # type: ignore
                     print("Genuine Probes Rejected:", frr)
-                    print("FRR% for Same User is:", frr / len(image_files))
+                    print("FRR% for Same User is:", frr / len(image_files))  # type: ignore
                     frr = 0
 
 

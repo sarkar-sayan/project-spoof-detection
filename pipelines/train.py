@@ -7,37 +7,43 @@ an SVM on concatenated logits and saves all weights under `saved_models/`.
 import os
 import pickle
 
-import torch
-from sklearn import svm
-from sklearn.metrics import accuracy_score
+import torch  # type: ignore
+from sklearn import svm  # type: ignore
+from sklearn.metrics import accuracy_score  # type: ignore
 
-from models import (
+import sys
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SAVED_MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
+os.makedirs(SAVED_MODELS_DIR, exist_ok=True)
+
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
+
+from lib.train_ensemble import (
     Cal_Confidence,
-    PreProcess_img,
     criterion,
-    data_transforms,
     get_LBP,
-    get_TVT,
     get_model1,
     get_model3,
     get_model7,
     get_models,
     get_weighted_score_ft,
     get_weighted_score_img,
+    test_acc,
+    train_model,
+)
+from lib.utils import (
+    PreProcess_img,
+    data_transforms,
+    get_TVT,
     lbp_transforms,
     lr,
     normalisation,
     num_epoch,
-    test_acc,
-    train_model,
 )
 
 
 DATA_ROOT = "/content/drive/MyDrive/DataSets/Palmvein_h/"
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAVED_MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
-os.makedirs(SAVED_MODELS_DIR, exist_ok=True)
 
 
 def main() -> None:
